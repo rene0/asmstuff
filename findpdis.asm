@@ -1,30 +1,12 @@
-DOSSEG       ; Segmenten zoals DOS
-.MODEL SMALL ; Alle referenties zijn default NEAR
-
-.386
-.STACK       ; 1 Kb
-
-; *******************************DATA SEGMENT***********************************
-
-.DATA? ; Data zonder initiële waarde
-EXTRN FHandle:WORD,Freq:WORD
-BufNumb DB 10 DUP (?)
-.DATA  ; Data met initiële waarde
-PUBLIC FileName
-FileName DB 'FindPDIs.LST',0
-CRLF DB 13,10
-
-; **************************CODE SEGMENT****************************************
-
-.CODE
-EXTRN OpenFile:PROC,CloseFile:PROC,GetVidSegment:PROC,WipeScreen:PROC,Sound:PROC
-EXTRN NoSound:PROC,DecToStr:PROC,StrToDec:PROC,InitDelay:PROC,Delay:PROC
+[SEGMENT .text]
+EXTERN OpenFile,CloseFile,GetVidSegment,WipeScreen,Sound,NoSound
+EXTERN DecToStr,StrToDec,InitDelay,Delay
 
 ; ------------------------------------------------------------------------------
 ; CheckNumber - 1999-07-12
 ; DOEL : Kijkt of EDX een PDI is (ZF=1) en schrijft EDX naar het scherm (CX=len)
 ; ------------------------------------------------------------------------------
-CheckNumber MACRO
+%MACRO CheckNumber 0
   push EDX       ; Bewaar het origineel
   mov EAX,EDX    ; EAX wordt gedeeld
   mov EBX,10     ; Deelfactor
@@ -35,7 +17,7 @@ NonZero:
   div EBX        ; Deel EAX (=N) door 10
   push EDX
   add DX,0730h   ; Attribuut, naar cijfer
-  mov ES:[DI],DX
+  mov [ES:DI],DX
   dec DI
   dec DI
   inc CX         ; Weer een cijfer gedaan
@@ -69,7 +51,7 @@ NextDigit:
   mov CX,DX      ; Count weer in CX
   pop EDX        ; origineel hersteld
   cmp EBX,EDX    ; ZF=1 -> PDI
-ENDM
+%ENDMACRO
 
 ; ------------------------------------------------------------------------------
 ; MoveFilePointer - 1999-07-10
@@ -78,15 +60,14 @@ ENDM
 ; GEBRUIKT : DX
 ; SCHRIJFT : AX,CX,CF
 ; ------------------------------------------------------------------------------
-MoveFilePointer PROC
+MoveFilePointer:
   push DX        ; Bewaar lo(PDICount)
-  mov AH,42h     ; Move file pointer (BX=FHandle)
+  mov AH,0x42    ; Move file pointer (BX=FHandle)
   mov CX,0       ; Geen offset
   mov DX,0       ;  "     "
-  INT 21h        ; roep DOS aan
+  INT 0x21       ; roep DOS aan
   pop DX         ; Herstel lo(PDICount)
   RET
-MoveFilePointer ENDP
 
 ; ------------------------------------------------------------------------------
 ; WriteNum - 1999-07-09
@@ -95,20 +76,19 @@ MoveFilePointer ENDP
 ; SCHRIJFT : AX,CX,DI,CF,BufNumb
 ; GEBRUIKT : DX
 ; ------------------------------------------------------------------------------
-WriteNum PROC
+WriteNum:
   push DX        ; Bewaar lo(PDICount)
-  lea DI,BufNumb ; EDX -> DS:DI
+  lea DI,[BufNumb] ; EDX -> DS:DI
   CALL DecToStr
-  mov AH,40h     ; Write to file/device
-  lea DX,BufNumb ; van DS:DX
-  INT 21h        ; roep DOS aan
+  mov AH,0x40    ; Write to file/device
+  lea DX,[BufNumb] ; van DS:DX
+  INT 0x21       ; roep DOS aan
   mov CX,2       ; lengte CRLF
-  lea DX,CRLF
-  mov AH,40h     ; in AX staat het aantal geschreven bytes
-  INT 21h        ; roep DOS aan
+  lea DX,[CRLF]
+  mov AH,0x40    ; in AX staat het aantal geschreven bytes
+  INT 0x21       ; roep DOS aan
   pop DX         ; Herstel lo(PDICount)
   RET
-WriteNum ENDP
 
 ; ------------------------------------------------------------------------------
 ; ReadCounter - 1999-07-12
@@ -117,16 +97,16 @@ WriteNum ENDP
 ; SCHRIJFT  : BX,AH,CX,EDX,SI,CF
 ; ROEPT AAN : StrToDec
 ; ------------------------------------------------------------------------------
-ReadCounter MACRO
+%MACRO ReadCounter 0
   mov BX,AX      ; Copy FHandle
-  mov AH,3Fh     ; Read file/device
+  mov AH,0x3F    ; Read file/device
   mov CX,10      ; aantal bytes
-  lea DX,BufNumb ; buffer op DS:DX
-  INT 21h        ; roep DOS aan
+  lea DX,[BufNumb] ; buffer op DS:DX
+  INT 0x21       ; roep DOS aan
   JC Close       ; Bij fout proberen te sluiten
-  lea SI,BufNumb
+  lea SI,[BufNumb]
   CALL StrToDec  ; DS:SI -> EDX
-ENDM
+%ENDMACRO
 
 ; ------------------------------------------------------------------------------
 ; WriteCounter - 1999-07-12
@@ -135,7 +115,7 @@ ENDM
 ; SCHRIJFT  : AX,CX,DX,SI,DI,CF
 ; ROEPT AAN : DecToStr,MoveFilePointer
 ; ------------------------------------------------------------------------------
-WriteCounter MACRO
+%MACRO WriteCounter 0
   mov BX,FHandle ; Vernietigd door CheckNumber
   mov AL,0       ; Move file pointer to top
   CALL MoveFilePointer
@@ -144,18 +124,18 @@ WriteCounter MACRO
   mov CX,9       ; aantal bytes
   mov SI,10      ; 10 lang, voorlopende 0
   CALL WriteNum  ; hierna bestand gesloten
-ENDM
+%ENDMACRO
 
 ; ------------------------------------------------------------------------------
 ; WritePDI - 1999-07-09
 ; DOEL : Voegt EDX toe aan FindPDIs.LST
 ; ------------------------------------------------------------------------------
-WritePDI MACRO
+%MACRO WritePDI 0
   mov BX,FHandle ; Vernietigd door CheckNumber
   mov SI,0       ; eigen lengte
   CALL WriteNum
   JC Close       ; bij fout proberen te sluiten
-ENDM
+%ENDMACRO
 
 ; ------------------------------------------------------------------------------
 ; Main - 1999-07-10
@@ -165,7 +145,7 @@ ENDM
 ; ROEPT AAN : GetVidSegment,WipeScreen,OpenFile,CloseFile,MoveFilePointer
 ; MACRO'S   : ReadCounter,WriteCounter,CheckNumber,WritePDI
 ; ------------------------------------------------------------------------------
-Main PROC
+..start:
   mov AX,DGroup ; Zet eigen datasegment in DS op
   mov DS,AX     ; via een GP-register
 
@@ -179,27 +159,38 @@ Main PROC
   mov AL,2      ; File pointer naar einde
   CALL MoveFilePointer
 CheckNumb:
-  mov AH,11h    ; 1 cyclus, net als xor
-  INT 16h       ; Check keyboard
+  mov AH,0x11   ; 1 cyclus, net als xor
+  INT 0x16      ; Check keyboard
   JNZ Abort     ; Geen toets -> ZF=1
   CheckNumber
   JNZ NextNumb  ; Getal is geen PDI
   WritePDI
-  mov Freq,1000 ; Hz
+  mov WORD [Freq],1000 ; Hz
   CALL Sound
   mov CX,500   ; ms wachten
   CALL Delay
   CALL NoSound
 NextNumb:
   inc EDX
-  JNZ CheckNumb ; 0FFFFFFFFh + 1 = 0
+  JNZ CheckNumb ; 0xFFFFFFFF + 1 = 0
 Abort:
   WriteCounter
 Close:
   CALL CloseFile
 Einde:
-  mov AH,4Ch    ; Terminate process DOS Service
-  INT 21h       ; Roep DOS aan
-Main ENDP
+  mov AH,0x4C   ; Terminate process DOS Service
+  INT 0x21      ; Roep DOS aan
 
-END Main
+[SEGMENT .data]
+GLOBAL FileName
+FileName DB 'findpdis.lst',0
+CRLF DB 13,10
+
+[SEGMENT .bss]
+EXTERN FHandle,Freq
+BufNumb RESB 10
+
+[SEGMENT .stack stack]
+RESB 1024
+
+GROUP DGroup data bss stack

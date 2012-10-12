@@ -78,8 +78,7 @@ Delay:
 
 [SEGMENT .data]
 GLOBAL WkDTabl
-WkDTabl
-  DB 'Ma' ; 1e dag
+WkDTabl DB 'Ma' ; 1e dag
   DB 'Di'
   DB 'Wo'
   DB 'Do'

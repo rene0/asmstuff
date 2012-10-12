@@ -123,7 +123,7 @@ DrawBigChar:
 ; GEBRUIKT : CX
 ; SCHRIJFT : AX,DI
 ; ------------------------------------------------------------------------------
-DispWkD
+DispWkD:
   push CX            ; Bewaar het register
 
   add CL,3           ; CL wijst naar de Y-positie
@@ -236,7 +236,7 @@ DispWkD
 
   ExitPrint:
 %ENDMACRO
-
+
 ; ------------------------------------------------------------------------------
 ; EmitBeep - 1999-07-01.
 ; DOEL      : Zendt een piepje van 0,1 seconde uit. De frequentie staat in Freq.
